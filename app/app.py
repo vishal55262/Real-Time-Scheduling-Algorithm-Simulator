@@ -6,7 +6,8 @@ from models import Task, ScheduleEvent
 class State(rx.State):
     tasks: List[Task] = []
     algorithm: str = "rm"
-    simulation_result: dict = {}
+    events: List[dict] = []
+    missed_deadlines: List[int] = []
     task_name: str = ""
     task_period: str = ""
     task_execution: str = ""
@@ -43,13 +44,16 @@ class State(rx.State):
         async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
             try:
                 response = await client.post(endpoint, json=[t.dict() for t in self.tasks])
-                self.simulation_result = response.json()
+                data = response.json()
+                self.events = data.get("events", [])
+                self.missed_deadlines = data.get("missed_deadlines", [])
             except:
-                self.simulation_result = {"error": "Failed to run simulation"}
+                self.events = []
+                self.missed_deadlines = []
 
 def task_input():
     return rx.vstack(
-        rx.heading("Add Task", size="md"),
+        rx.heading("Add Task", size="5"),
         rx.input(placeholder="Task Name", value=State.task_name, on_change=State.set_task_name),
         rx.input(placeholder="Period", value=State.task_period, on_change=State.set_task_period),
         rx.input(placeholder="Execution Time", value=State.task_execution, on_change=State.set_task_execution),
@@ -60,11 +64,11 @@ def task_input():
 
 def task_list():
     return rx.vstack(
-        rx.heading("Tasks", size="md"),
+        rx.heading("Tasks", size="5"),
         rx.foreach(
             State.tasks,
             lambda task: rx.hstack(
-                rx.text(f"{task.name}: P={task.period}, C={task.execution_time}, D={task.deadline or task.period}"),
+                rx.text(rx.cond(task.deadline, f"{task.name}: P={task.period}, C={task.execution_time}, D={task.deadline}", f"{task.name}: P={task.period}, C={task.execution_time}, D={task.period}")),
                 rx.button("Remove", on_click=lambda: State.remove_task(task.id)),
                 spacing="2",
             )
@@ -74,47 +78,31 @@ def task_list():
 
 def simulation_controls():
     return rx.vstack(
-        rx.heading("Simulation", size="md"),
+        rx.heading("Simulation", size="5"),
         rx.select(["rm", "edf"], value=State.algorithm, on_change=State.set_algorithm),
         rx.button("Run Simulation", on_click=State.run_simulation),
         spacing="2",
     )
 
 def results_display():
-    return rx.cond(
-        State.simulation_result,
+    return rx.vstack(
+        rx.heading("Results", size="5"),
+        rx.text(f"Missed Deadlines: {State.missed_deadlines}"),
+        rx.text("Execution Timeline:"),
         rx.vstack(
-            rx.heading("Results", size="md"),
-            rx.text(f"Missed Deadlines: {State.simulation_result.get('missed_deadlines', [])}"),
-            rx.text("Execution Timeline:"),
-            rx.table(
-                rx.thead(
-                    rx.tr(
-                        rx.th("Time"),
-                        rx.th("Task"),
-                        rx.th("Action"),
-                    )
-                ),
-                rx.tbody(
-                    rx.foreach(
-                        State.simulation_result.get("events", []),
-                        lambda event: rx.tr(
-                            rx.td(event['time']),
-                            rx.td(f"Task {event['task_id']}"),
-                            rx.td(event['action']),
-                        )
-                    )
-                ),
+            rx.foreach(
+                State.events,
+                lambda event: rx.text(f"Time {event['time']}: Task {event['task_id']} {event['action']}")
             ),
-            spacing="2",
+            spacing="1",
         ),
-        rx.text("No results yet")
+        spacing="2",
     )
 
 def index():
     return rx.center(
         rx.vstack(
-            rx.heading("Real-Time Scheduling Algorithm Simulator", size="lg"),
+            rx.heading("Real-Time Scheduling Algorithm Simulator", size="4"),
             rx.hstack(
                 task_input(),
                 task_list(),
@@ -127,5 +115,5 @@ def index():
         height="100vh",
     )
 
-app = rx.App(state=State)
+app = rx.App()
 app.add_page(index, route="/")
