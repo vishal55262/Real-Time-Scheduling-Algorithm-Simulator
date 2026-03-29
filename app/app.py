@@ -86,10 +86,25 @@ def results_display():
         rx.vstack(
             rx.heading("Results", size="md"),
             rx.text(f"Missed Deadlines: {State.simulation_result.get('missed_deadlines', [])}"),
-            rx.text("Events:"),
-            rx.foreach(
-                State.simulation_result.get("events", []),
-                lambda event: rx.text(f"Time {event['time']}: Task {event['task_id']} {event['action']}")
+            rx.text("Execution Timeline:"),
+            rx.table(
+                rx.thead(
+                    rx.tr(
+                        rx.th("Time"),
+                        rx.th("Task"),
+                        rx.th("Action"),
+                    )
+                ),
+                rx.tbody(
+                    rx.foreach(
+                        State.simulation_result.get("events", []),
+                        lambda event: rx.tr(
+                            rx.td(event['time']),
+                            rx.td(f"Task {event['task_id']}"),
+                            rx.td(event['action']),
+                        )
+                    )
+                ),
             ),
             spacing="2",
         ),
