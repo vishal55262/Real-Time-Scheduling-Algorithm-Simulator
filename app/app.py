@@ -1,3 +1,4 @@
+import os
 import reflex as rx
 from typing import List
 import httpx
@@ -41,13 +42,15 @@ class State(rx.State):
         if not self.tasks:
             return
         endpoint = f"/simulate/{self.algorithm}"
-        async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+        base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+        async with httpx.AsyncClient(base_url=base_url) as client:
             try:
                 response = await client.post(endpoint, json=[t.dict() for t in self.tasks])
+                response.raise_for_status()
                 data = response.json()
                 self.events = data.get("events", [])
                 self.missed_deadlines = data.get("missed_deadlines", [])
-            except:
+            except Exception:
                 self.events = []
                 self.missed_deadlines = []
 
